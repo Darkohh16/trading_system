@@ -6,3 +6,12 @@
 /productos/migrations/
 /proveedores/migrations/
 /ventas/migrations/
+/api/migrations/
+
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
