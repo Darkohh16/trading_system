@@ -9,7 +9,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from django.db.models import Prefetch
 
 from productos.models import LineaArticulo, GrupoArticulo, Articulo
-from api.serializers import (
+from productos.serializers import (
     LineaArticuloSerializer,
     GrupoArticuloSerializer,
     ArticuloSerializer,
