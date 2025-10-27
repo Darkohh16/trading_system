@@ -6,3 +6,5 @@
 /productos/migrations/
 /proveedores/migrations/
 /ventas/migrations/
+
+venv/
