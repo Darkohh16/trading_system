@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,6 +38,9 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'accounts',
     'auditoria',
     'clientes',
@@ -75,7 +79,7 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'trading_system.wsgi.application'
-AUTH_USER_MODEL = 'accounts.Usuario' # Asegúrate de que está correctamente configurado
+AUTH_USER_MODEL = 'accounts.Usuario'
 
 
 # Database
@@ -86,7 +90,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'trading_sys',
         'USER': 'postgres',
-        'PASSWORD': 'admin',
+        'PASSWORD': '6458',
         'HOST': '127.0.0.1',
         'PORT': '5432'
     }
@@ -133,3 +137,101 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Rest Framework
+REST_FRAMEWORK = {
+    # AUTH
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    
+    # Permisos
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    
+    # Paginación
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardResultsSetPagination',
+    'PAGE_SIZE': 10,
+    
+    # Filtros
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    
+    # Throttling
+    'DEFAULT_THROTTLE_CLASSES': [
+        'core.throttling.BurstRateThrottle',
+        'core.throttling.SustainedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon_burst': '20/min',
+        'anon_sustained': '100/day',
+        'burst': '60/min',
+        'sustained': '1000/day',
+        'uploads': '10/hour',
+        'custom': '100/hour',
+    },
+    
+    # Versionamiento
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'DEFAULT_VERSION': 'v1',
+    'ALLOWED_VERSIONS': ['v1', 'v2'],
+    'VERSION_PARAM': 'version',
+    
+    # Renderizado
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',
+    ],
+    
+    # Parsers
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser',
+    ],
+    
+    
+    # Respuestas de fecha y hora
+    'DATETIME_FORMAT': '%Y-%m-%d %H:%M:%S',
+    'DATE_FORMAT': '%Y-%m-%d',
+    'TIME_FORMAT': '%H:%M:%S',
+    
+    # Esquemas
+    'COERCE_DECIMAL_TO_STRING': False,
+    'NON_FIELD_ERRORS_KEY': 'errors',
+    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
+}
+
+
+# JWT
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,
+    
+    # IMPORTANTE: Configuración para modelo Usuario con username como PK
+    'USER_ID_FIELD': 'username',
+    'USER_ID_CLAIM': 'username',
+    
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
+    
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'VERIFYING_KEY': None,
+    'AUDIENCE': None,
+    'ISSUER': None,
+    
+    'AUTH_TOKEN_CLASSES': ('rest_framework_simplejwt.tokens.AccessToken',),
+    'TOKEN_TYPE_CLAIM': 'token_type',
+    
+    'JTI_CLAIM': 'jti',
+}
