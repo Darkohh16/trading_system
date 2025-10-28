@@ -9,7 +9,7 @@ from datetime import datetime
 
 from precios.models import ListaPrecio
 from precios.serializers.lista_precio import *
-#from precios.filters import ListaPrecioFilter
+from precios.filters import ListaPrecioFilter
 
 class ListaPrecioViewSet(viewsets.ModelViewSet):
     """
@@ -24,9 +24,9 @@ class ListaPrecioViewSet(viewsets.ModelViewSet):
         - DELETE /api/listas/{id}/     -> destroy()
     """
 
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
-    #filterset_class = ListaPrecioFilter
+    filterset_class = ListaPrecioFilter
     search_fields = ['codigo', 'nombre']
     ordering_fields = ['fecha_vigencia_inicio', 'fecha_creacion', 'nombre']
     ordering = ['-fecha_creacion']

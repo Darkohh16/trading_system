@@ -9,7 +9,7 @@ from precios.serializers.precio_articulo import *
 
 class PrecioArticuloViewSet(viewsets.ModelViewSet):
 
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
         queryset = PrecioArticulo.objects.select_related(
@@ -35,7 +35,7 @@ class PrecioArticuloViewSet(viewsets.ModelViewSet):
         """
 
 #precios en la lista
-class ListaPrecioViewSet(viewsets.ModelViewSet):
+class ListaPrecioArticuloViewSet(viewsets.ModelViewSet):
     """
     - GET    /api/listas/{lista_id}/precios/
     - POST   /api/listas/{lista_id}/precios/
@@ -44,7 +44,7 @@ class ListaPrecioViewSet(viewsets.ModelViewSet):
     - DELETE /api/listas/{lista_id}/precios/{id}/
     """
 
-    permission_classes = [IsAuthenticated]
+    #permission_classes = [IsAuthenticated]
     serializer_class = ListaPrecioCrearActualizarSerializer
 
     def get_queryset(self):
