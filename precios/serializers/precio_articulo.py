@@ -44,7 +44,7 @@ class PrecioArticuloDetalleSerializer(serializers.ModelSerializer):
         model = PrecioArticulo
         fields = '__all__'
 
-class PrcioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
+class PrecioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = PrecioArticulo
