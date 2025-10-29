@@ -1,5 +1,5 @@
 """
-URLs para la API REST del sistema de Trading
+URLs para la API REST del módulo de Catálogo de Productos
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
@@ -13,9 +13,9 @@ from productos.views import (
 router = DefaultRouter()
 
 # Registro de ViewSets del módulo Catálogo de Productos
-router.register(r'catalogo/lineas', LineaArticuloViewSet, basename='linea-articulo')
-router.register(r'catalogo/grupos', GrupoArticuloViewSet, basename='grupo-articulo')
-router.register(r'catalogo/articulos', ArticuloViewSet, basename='articulo')
+router.register(r'lineas', LineaArticuloViewSet, basename='linea-articulo')
+router.register(r'grupos', GrupoArticuloViewSet, basename='grupo-articulo')
+router.register(r'articulos', ArticuloViewSet, basename='articulo')
 
 # Patrón de URLs
 urlpatterns = [
