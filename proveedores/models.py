@@ -1,9 +1,10 @@
 from django.db import models
 
 from trading_system.choices import *
+import uuid
 
 class Proveedor(models.Model):
-    proveedor_id = models.UUIDField(primary_key=True)
+    proveedor_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     ruc = models.CharField(max_length=11, null=False, unique=True)
     nombre_comercial = models.CharField(max_length=200, null=False)
     razon_social = models.CharField(max_length=200, null=False)
