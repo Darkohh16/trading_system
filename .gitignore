@@ -6,9 +6,27 @@
 /productos/migrations/
 /proveedores/migrations/
 /ventas/migrations/
+/api/migrations/
 
-venv/
 
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+
+*.egg
+*.whl
+*.egg-info/
+dist/
+build/
+venv/
+venv/
+env/
+/bin/
+/include/
+/lib/
+/share/
+*.pyc
+__pycache__/
