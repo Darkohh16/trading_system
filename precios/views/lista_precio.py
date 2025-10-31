@@ -24,7 +24,7 @@ class ListaPrecioViewSet(viewsets.ModelViewSet):
         - DELETE /api/listas/{id}/     -> destroy()
     """
 
-    #permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_class = ListaPrecioFilter
     search_fields = ['codigo', 'nombre']
