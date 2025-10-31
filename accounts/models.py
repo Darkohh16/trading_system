@@ -13,7 +13,7 @@ class Usuario(AbstractUser):
     last_name = models.CharField(max_length=50, blank=False, null=False)
     email = models.EmailField(unique=True, null=False)
     celular = models.CharField(max_length=11, blank=False, null=False)
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.RESTRICT, null=False, related_name='usuarios_sucursal')
+    #sucursal = models.ForeignKey(Sucursal, on_delete=models.RESTRICT, null=False, related_name='usuarios_sucursal')
     perfil = models.IntegerField(choices=AccesoSistema, null=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True, null=False)
     puede_aprobar_bajo_costo = models.BooleanField(default=False)

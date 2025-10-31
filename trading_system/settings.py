@@ -45,7 +45,15 @@ INSTALLED_APPS = [
     'productos',
     'proveedores',
     'ventas',
+    'rest_framework',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+    ]
+}
+
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -85,13 +93,13 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'trading_sys',
-        'USER': 'postgres',
-        'PASSWORD': 'admin',
+        'USER': 'admin_clientes',
+        'PASSWORD': '123',
         'HOST': '127.0.0.1',
-        'PORT': '5432'
-    }
+        'PORT': '5432',
+        
+        }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
