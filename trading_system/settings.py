@@ -50,15 +50,7 @@ INSTALLED_APPS = [
     'productos',
     'proveedores',
     'ventas',
-    'rest_framework',
 ]
-
-REST_FRAMEWORK = {
-    'DEFAULT_FILTER_BACKENDS': [
-        'rest_framework.filters.SearchFilter',
-    ]
-}
-
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -98,8 +90,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'trading_sys',
-        'USER': 'admin_clientes',
-        'PASSWORD': '123',
+        'USER': 'postgres',
+        'PASSWORD': 'admin',
         'HOST': '127.0.0.1',
         'PORT': '5432',
         

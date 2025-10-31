@@ -11,6 +11,7 @@ class Cliente(models.Model):
     telefono = models.CharField(max_length=20, null=True, blank=True)
     email = models.EmailField(max_length=100, null=True, blank=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True, null=False)
+    estado = models.IntegerField(choices=EstadoEntidades, default=EstadoEntidades.ACTIVO)
     canal = models.IntegerField(choices=CanalVenta, null=False)
     fecha_modificacion = models.DateTimeField(auto_now=True, null=False)
 

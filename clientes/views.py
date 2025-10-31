@@ -1,6 +1,7 @@
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 from .models import Cliente
 from .serializers import ClienteSerializer
@@ -13,6 +14,7 @@ class ClienteViewSet(viewsets.ModelViewSet):
     - Buscar clientes por nombre, documento o razón social
     - Ver historial y estadísticas de compras
     """
+    permission_classes = [IsAuthenticated]
     queryset = Cliente.objects.all().order_by('nombre_comercial')
     serializer_class = ClienteSerializer
 
@@ -68,3 +70,13 @@ class ClienteViewSet(viewsets.ModelViewSet):
             "cliente": cliente.nombre_comercial,
             "estadisticas": estadisticas
         }, status=status.HTTP_200_OK)
+
+    def destroy(self, request, *args, **kwargs):
+        instancia = self.get_object()
+        instancia.estado = 0
+        instancia.save()
+
+        return Response(
+            {'message': 'Cliente desactivado correctamente.'},
+            status=status.HTTP_200_OK
+        )
