@@ -164,19 +164,6 @@ REST_FRAMEWORK = {
         'rest_framework.filters.OrderingFilter',
     ],
     
-    # Throttling
-    'DEFAULT_THROTTLE_CLASSES': [
-        'core.throttling.BurstRateThrottle',
-        'core.throttling.SustainedRateThrottle',
-    ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon_burst': '20/min',
-        'anon_sustained': '100/day',
-        'burst': '60/min',
-        'sustained': '1000/day',
-        'uploads': '10/hour',
-        'custom': '100/hour',
-    },
     
     # Versionamiento
     'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
@@ -201,11 +188,6 @@ REST_FRAMEWORK = {
     'DATETIME_FORMAT': '%Y-%m-%d %H:%M:%S',
     'DATE_FORMAT': '%Y-%m-%d',
     'TIME_FORMAT': '%H:%M:%S',
-    
-    # Esquemas
-    'COERCE_DECIMAL_TO_STRING': False,
-    'NON_FIELD_ERRORS_KEY': 'errors',
-    'TEST_REQUEST_DEFAULT_FORMAT': 'json',
 }
 
 
@@ -217,7 +199,7 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,
     'UPDATE_LAST_LOGIN': True,
     
-    # IMPORTANTE: Configuración para modelo Usuario con username como PK
+
     'USER_ID_FIELD': 'username',
     'USER_ID_CLAIM': 'username',
     
