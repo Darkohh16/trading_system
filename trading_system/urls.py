@@ -9,8 +9,9 @@ from rest_framework_simplejwt.views import (
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
-
+  
     # Endpoints principales de la API
+    path('api/', include('precios.urls'))
     path('api/', include('core.urls')),
     path('api/', include('accounts.urls')),
 
