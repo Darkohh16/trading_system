@@ -90,7 +90,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': 'trading_sys',
         'USER': 'postgres',
-        'PASSWORD': '6458',
+        'PASSWORD': 'admin',
         'HOST': '127.0.0.1',
         'PORT': '5432'
     }
@@ -138,6 +138,12 @@ STATIC_URL = 'static/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=120),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+    'USER_ID_FIELD': 'username',
+    'USER_ID_CLAIM': 'user_id',
+}
 
 # Rest Framework
 REST_FRAMEWORK = {

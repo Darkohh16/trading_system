@@ -1,3 +1,5 @@
+from random import choices
+
 from django.contrib.auth.models import BaseUserManager
 
 
@@ -41,7 +43,7 @@ class UserManager(BaseUserManager):
         user.save(using=self._db)
         return user
     
-    def create_superuser(self, username, first_name, last_name, email, celular, sucursal, perfil, password=None, **extra_fields):
+    def create_superuser(self, username, first_name, last_name, email, celular=None, perfil=1, sucursal=None, password=None, **extra_fields):
         """
         Crea y guarda un superusuario con privilegios de administrador
         """
