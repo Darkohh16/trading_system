@@ -18,7 +18,7 @@ class OrdenCompraCliente(models.Model):
     total = models.DecimalField(max_digits=10, decimal_places=2, null=False, default=0)
     estado = models.IntegerField(choices=EstadoOrden, default=EstadoOrden.PENDIENTE, null=False)
 
-    def __str__(self):
+    def _str_(self):
         return f"Orden {self.numero_orden} - Cliente: {self.cliente.nombre_completo}"
 
     class Meta:
@@ -48,7 +48,7 @@ class DetalleOrdenCompraCliente(models.Model):
         self.orden_compra_cliente.total = self.orden_compra_cliente.subtotal - self.orden_compra_cliente.descuento_total
         self.orden_compra_cliente.save()
 
-    def __str__(self):
+    def _str_(self):
         return f"{self.cantidad} x {self.articulo.descripcion}"
 
     class Meta:
