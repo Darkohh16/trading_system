@@ -38,14 +38,12 @@ class OrdenViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         orden = serializer.save()
         read_serializer = OrdenReadSerializer(orden)
-        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(read_serializer.data, status=status.HTTP_21_CREATED)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
         instance = self.get_object()
 
-        # La validación de estado ahora está en el serializer, pero una
-        # comprobación temprana aquí puede ahorrar trabajo.
         if instance.estado != EstadoOrden.PENDIENTE:
             return Response(
                 {"detail": "Solo se pueden actualizar órdenes en estado PENDIENTE."},
@@ -68,10 +66,24 @@ class OrdenViewSet(viewsets.ModelViewSet):
             )
         
         with transaction.atomic():
+            # 1. Validar stock
+            for detalle in orden.detalles_orden_compra_cliente.all():
+                if detalle.cantidad > detalle.articulo.stock:
+                    return Response(
+                        {"detail": f"Stock insuficiente para el artículo {detalle.articulo.descripcion}. Stock disponible: {detalle.articulo.stock}, solicitado: {detalle.cantidad}."},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # 2. Descontar stock
+            for detalle in orden.detalles_orden_compra_cliente.all():
+                articulo = detalle.articulo
+                articulo.stock -= detalle.cantidad
+                articulo.save(update_fields=['stock'])
+
+            # 3. Cambiar estado de la orden
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} confirmada"):
                 orden.estado = EstadoOrden.PROCESANDO
                 orden.save()
-                # TODO: Lógica de descontar stock
 
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
@@ -79,17 +91,25 @@ class OrdenViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='anular')
     def anular_orden(self, request, pk=None):
         orden = self.get_object()
-        if orden.estado not in [EstadoOrden.PENDIENTE, EstadoOrden.PROCESANDO]:
+        estado_original = orden.estado
+
+        if estado_original not in [EstadoOrden.PENDIENTE, EstadoOrden.PROCESANDO]:
             return Response(
                 {"detail": "Solo se pueden anular órdenes en estado PENDIENTE o PROCESANDO."},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
         with transaction.atomic():
+            # Si la orden estaba en PROCESANDO, reponer stock
+            if estado_original == EstadoOrden.PROCESANDO:
+                for detalle in orden.detalles_orden_compra_cliente.all():
+                    articulo = detalle.articulo
+                    articulo.stock += detalle.cantidad
+                    articulo.save(update_fields=['stock'])
+
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} anulada"):
                 orden.estado = EstadoOrden.CANCELADA
                 orden.save()
-                # TODO: Lógica de reponer stock
 
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
@@ -121,10 +141,15 @@ class OrdenViewSet(viewsets.ModelViewSet):
             )
         
         with transaction.atomic():
+            # Reponer stock porque la orden estaba completada (stock ya descontado)
+            for detalle in orden.detalles_orden_compra_cliente.all():
+                articulo = detalle.articulo
+                articulo.stock += detalle.cantidad
+                articulo.save(update_fields=['stock'])
+
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} confirmada anulada"):
                 orden.estado = EstadoOrden.CANCELADA
                 orden.save()
-                # TODO: Lógica de reversión de stock, contabilidad, etc.
 
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
@@ -139,8 +164,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
             )
         
         with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} aprobada bajo costo"):
-            # Aquí podría ir lógica adicional, como cambiar un flag en la orden.
-            # Por ahora, la aprobación es implícita al no devolver error.
             pass
         
         read_serializer = OrdenReadSerializer(orden)
@@ -154,7 +177,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
         serializer = DetalleOrdenWriteSerializer(data=request.data.get('detalles', []), many=True)
         serializer.is_valid(raise_exception=True)
         
-        # Para simular, necesitamos la lista de precios y el canal
         lista_precio_id = request.data.get('lista_precio_id')
         canal = request.data.get('canal')
         if not lista_precio_id or not canal:
