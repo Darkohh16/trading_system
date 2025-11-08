@@ -34,7 +34,7 @@ class ListaPrecioSerializer(serializers.ModelSerializer):
         read_only_fields = ['fecha_creacion', 'fecha_modificacion', 'cantidad_articulos']
 
     def get_cantidad_articulos(self, obj):
-        return obj.precios_articulos.filter(estado=1).count()
+        return obj.precios_articulos_lista.filter(estado=1).count()
 
 class ListaPrecioDetalleSerializer(serializers.ModelSerializer):
     #GET /api/listas/{id}/

@@ -6,6 +6,7 @@ from django.utils import timezone
 
 from precios.models import ReglaPrecio
 from precios.serializers.regla_precio import ReglaPrecioSerializer
+from auditoria.signals import set_current_user
 
 
 class ReglaPrecioViewSet(viewsets.ModelViewSet):
@@ -34,6 +35,23 @@ class ReglaPrecioViewSet(viewsets.ModelViewSet):
 
         return queryset.order_by('prioridad', '-fecha_creacion')
 
+    def perform_create(self, serializer):
+        """Establece el contexto de auditoría antes de crear"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """Establece el contexto de auditoría antes de actualizar"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        """Establece el contexto de auditoría antes de eliminar"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        instance.delete()
 
     @action(detail=False, methods=['get'], url_path='activas')
     def activas(self, request):
@@ -87,6 +105,8 @@ class ReglaPrecioViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='activar')
     def activar(self, request, pk=None):
         """POST /api/reglas/{id}/activar/"""
+        if request.user.is_authenticated:
+            set_current_user(request.user)
         regla = self.get_object()
         regla.estado = 1
         regla.save()
@@ -98,6 +118,8 @@ class ReglaPrecioViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='desactivar')
     def desactivar(self, request, pk=None):
         """POST /api/reglas/{id}/desactivar/"""
+        if request.user.is_authenticated:
+            set_current_user(request.user)
         regla = self.get_object()
         regla.estado = 0
         regla.save()

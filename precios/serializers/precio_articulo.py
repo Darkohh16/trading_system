@@ -45,6 +45,11 @@ class PrecioArticuloDetalleSerializer(serializers.ModelSerializer):
         fields = '__all__'
 
 class PrecioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
+    motivo = serializers.CharField(
+        write_only=True,
+        required=False,
+        help_text="Motivo del cambio de precio (opcional)"
+    )
 
     class Meta:
         model = PrecioArticulo
@@ -54,6 +59,7 @@ class PrecioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
             'precio_base',
             'precio_minimo',
             'estado',
+            'motivo',
         ]
 
     def validate(self, data):
@@ -61,9 +67,9 @@ class PrecioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
         precio_base = data.get('precio_base')
         precio_minimo = data.get('precio_minimo')
 
-        #precio base >= costo actual
-        if precio_base > articulo.costo_actual:
-            #autorizacion del admin
+        # Validar que precio_base no sea menor que costo_actual (salvo autorización)
+        if precio_base and articulo and precio_base < articulo.costo_actual:
+            # Verificar autorización del proveedor
             hoy = timezone.now().date()
 
             autorizacion = DescuentoProveedorAutorizado.objects.filter(
@@ -75,7 +81,7 @@ class PrecioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
 
             if not autorizacion:
                 raise serializers.ValidationError({
-                    'precio_base': f'El precio base ({precio_base}) no puede ser menor que el costo actual ({articulo.costo_actual}) sin autorizacion.'
+                    'precio_base': f'El precio base ({precio_base}) no puede ser menor que el costo actual ({articulo.costo_actual}) sin autorización de descuento de proveedor.'
                 })
 
         #precio minimo <= precio base
@@ -99,5 +105,8 @@ class PrecioArticuloCrearActualizarSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({
                 'articulo': 'El articulo ya tiene un precio asignado en esta lista de precios.'
             })
+
+        if 'motivo' in data:
+            data.pop('motivo')
 
         return data
