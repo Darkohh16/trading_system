@@ -17,6 +17,7 @@ urlpatterns = [
     path('api/', include('clientes.urls')),
     path('api/', include('proveedores.urls')),
     path('api/', include('productos.urls')),
+    path('api/', include('ventas.urls')),
     path('api/auditoria/', include('auditoria.urls')),
 
     # Endpoints de autenticación JWT
