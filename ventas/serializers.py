@@ -10,6 +10,7 @@ from precios.models import ListaPrecio
 from accounts.models import Usuario
 from core.models import Empresa, Sucursal
 from trading_system.choices import EstadoOrden, CanalVenta
+from .utils import calculate_price
 
 
 class ArticuloSerializer(serializers.ModelSerializer):
@@ -50,14 +51,14 @@ class SucursalSerializer(serializers.ModelSerializer):
 
 class OrdenDetalleReadSerializer(serializers.ModelSerializer):
     articulo = ArticuloSerializer(read_only=True)
-    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    # estado_display = serializers.CharField(source='get_estado_display', read_only=True)
 
     class Meta:
         model = DetalleOrdenCompraCliente
         fields = [
             'detalle_orden_compra_cliente_id', 'articulo', 'cantidad',
             'precio_base', 'precio_unitario', 'descuento', 'reglas_aplicadas',
-            'vendido_bajo_costo', 'total_item', 'estado_display'
+            'vendido_bajo_costo', 'total_item'
         ]
 
 
@@ -112,32 +113,34 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
         Este método es crucial para sobrescribir la lógica problemática en el save() del modelo
         y garantizar la consistencia de los datos, especialmente después de operaciones en lote.
         """
+        # Usamos F() para referenciar campos del modelo en la agregación
         aggregates = orden.detalles_orden_compra_cliente.aggregate(
-            total_subtotal=Coalesce(Sum(F('cantidad') * F('precio_unitario')), 0, output_field=DecimalField()),
-            total_descuento=Coalesce(Sum('descuento'), 0, output_field=DecimalField())
+            total_general=Coalesce(Sum(F('cantidad') * F('precio_unitario')), 0, output_field=DecimalField()),
+            total_descuento_items=Coalesce(Sum('descuento'), 0, output_field=DecimalField())
         )
+        
+        # El subtotal es el precio de los items sin descuentos de reglas
+        subtotal_calculado = orden.detalles_orden_compra_cliente.aggregate(
+            total=Coalesce(Sum(F('cantidad') * F('precio_base')), 0, output_field=DecimalField())
+        )['total']
 
-        orden.subtotal = aggregates['total_subtotal']
-        orden.descuento_total = aggregates['total_descuento']
-        orden.total = orden.subtotal - orden.descuento_total
+        orden.subtotal = subtotal_calculado
+        orden.descuento_total = aggregates['total_descuento_items']
+        orden.total = aggregates['total_general']
         
         orden.save(update_fields=['subtotal', 'descuento_total', 'total'])
 
     @transaction.atomic
     def create(self, validated_data):
         detalles_data = validated_data.pop('detalles')
-        cliente_id = validated_data.pop('cliente_id')
-        vendedor_id = validated_data.pop('vendedor_id')
-        lista_precio_id = validated_data.pop('lista_precio_id')
-        empresa_id = validated_data.pop('empresa_id')
-        sucursal_id = validated_data.pop('sucursal_id')
-
+        canal = validated_data.get('canal')
+        
         try:
-            cliente = Cliente.objects.get(cliente_id=cliente_id)
-            vendedor = Usuario.objects.get(username=vendedor_id)
-            lista_precio = ListaPrecio.objects.get(lista_precio_id=lista_precio_id)
-            empresa = Empresa.objects.get(empresa_id=empresa_id)
-            sucursal = Sucursal.objects.get(sucursal_id=sucursal_id)
+            cliente = Cliente.objects.get(cliente_id=validated_data.pop('cliente_id'))
+            vendedor = Usuario.objects.get(username=validated_data.pop('vendedor_id'))
+            lista_precio = ListaPrecio.objects.get(lista_precio_id=validated_data.pop('lista_precio_id'))
+            empresa = Empresa.objects.get(empresa_id=validated_data.pop('empresa_id'))
+            sucursal = Sucursal.objects.get(sucursal_id=validated_data.pop('sucursal_id'))
         except (Cliente.DoesNotExist, Usuario.DoesNotExist, ListaPrecio.DoesNotExist, Empresa.DoesNotExist, Sucursal.DoesNotExist) as e:
             raise serializers.ValidationError(f"Error al encontrar una entidad relacionada: {e}")
 
@@ -159,21 +162,25 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
             except Articulo.DoesNotExist:
                 raise serializers.ValidationError(f"Artículo con ID {articulo_id} no encontrado.")
 
-            precio_base = articulo.precio_sugerido
-            precio_unitario = precio_base
-            descuento = 0
-            vendido_bajo_costo = False
-            reglas_aplicadas = {}
+            price_data = calculate_price(
+                articulo=articulo,
+                lista_precio=lista_precio,
+                canal=canal,
+                cantidad=cantidad
+            )
+
+            if "error" in price_data:
+                raise serializers.ValidationError(price_data["error"])
 
             DetalleOrdenCompraCliente.objects.create(
                 orden_compra_cliente=orden,
                 articulo=articulo,
                 cantidad=cantidad,
-                precio_base=precio_base,
-                precio_unitario=precio_unitario,
-                descuento=descuento,
-                reglas_aplicadas=reglas_aplicadas,
-                vendido_bajo_costo=vendido_bajo_costo,
+                precio_base=price_data["precio_base"],
+                precio_unitario=price_data["precio_final"],
+                descuento=price_data["descuento_total"],
+                reglas_aplicadas=price_data["reglas_aplicadas"],
+                vendido_bajo_costo=price_data["vendido_bajo_costo"],
             )
         
         self._recalculate_and_save_totals(orden)
@@ -185,14 +192,21 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Solo se pueden actualizar órdenes en estado PENDIENTE.")
 
         detalles_data = validated_data.pop('detalles', None)
+        canal = validated_data.get('canal', instance.canal)
+        lista_precio_id = validated_data.get('lista_precio_id', instance.lista_precio_id)
+        
+        try:
+            lista_precio = ListaPrecio.objects.get(lista_precio_id=lista_precio_id)
+        except ListaPrecio.DoesNotExist:
+            raise serializers.ValidationError(f"Lista de precios con ID {lista_precio_id} no encontrada.")
 
         # Actualizar campos directos de la orden
         instance.cliente_id = validated_data.get('cliente_id', instance.cliente_id)
         instance.vendedor_id = validated_data.get('vendedor_id', instance.vendedor_id)
-        instance.lista_precio_id = validated_data.get('lista_precio_id', instance.lista_precio_id)
+        instance.lista_precio = lista_precio
         instance.empresa_id = validated_data.get('empresa_id', instance.empresa_id)
         instance.sucursal_id = validated_data.get('sucursal_id', instance.sucursal_id)
-        instance.canal = validated_data.get('canal', instance.canal)
+        instance.canal = canal
         instance.save()
 
         if detalles_data is not None:
@@ -213,26 +227,36 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
                 except Articulo.DoesNotExist:
                     raise serializers.ValidationError(f"Artículo con ID {articulo_id} no encontrado.")
 
-                precio_base = articulo.precio_sugerido
-                precio_unitario = precio_base
-                descuento = 0
+                price_data = calculate_price(
+                    articulo=articulo,
+                    lista_precio=lista_precio,
+                    canal=canal,
+                    cantidad=cantidad
+                )
+
+                if "error" in price_data:
+                    raise serializers.ValidationError(price_data["error"])
 
                 if item_id:
                     detail = existing_details.get(str(item_id))
                     if detail:
                         detail.cantidad = cantidad
-                        detail.precio_base = precio_base
-                        detail.precio_unitario = precio_unitario
-                        detail.descuento = descuento
+                        detail.precio_base=price_data["precio_base"]
+                        detail.precio_unitario=price_data["precio_final"]
+                        detail.descuento=price_data["descuento_total"]
+                        detail.reglas_aplicadas=price_data["reglas_aplicadas"]
+                        detail.vendido_bajo_costo=price_data["vendido_bajo_costo"]
                         detail.save()
                 else:
                     DetalleOrdenCompraCliente.objects.create(
                         orden_compra_cliente=instance,
                         articulo=articulo,
                         cantidad=cantidad,
-                        precio_base=precio_base,
-                        precio_unitario=precio_unitario,
-                        descuento=descuento,
+                        precio_base=price_data["precio_base"],
+                        precio_unitario=price_data["precio_final"],
+                        descuento=price_data["descuento_total"],
+                        reglas_aplicadas=price_data["reglas_aplicadas"],
+                        vendido_bajo_costo=price_data["vendido_bajo_costo"],
                     )
         
         self._recalculate_and_save_totals(instance)
