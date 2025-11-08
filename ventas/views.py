@@ -6,6 +6,8 @@ from rest_framework.views import APIView
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.http import Http404
+from django.utils import timezone
+from django.db.models import Sum, Count
 from decimal import Decimal
 
 from ventas.models import OrdenCompraCliente
@@ -38,7 +40,7 @@ class OrdenViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         orden = serializer.save()
         read_serializer = OrdenReadSerializer(orden)
-        return Response(read_serializer.data, status=status.HTTP_21_CREATED)
+        return Response(read_serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop('partial', False)
@@ -66,7 +68,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
             )
         
         with transaction.atomic():
-            # 1. Validar stock
             for detalle in orden.detalles_orden_compra_cliente.all():
                 if detalle.cantidad > detalle.articulo.stock:
                     return Response(
@@ -74,13 +75,11 @@ class OrdenViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
             
-            # 2. Descontar stock
             for detalle in orden.detalles_orden_compra_cliente.all():
                 articulo = detalle.articulo
                 articulo.stock -= detalle.cantidad
                 articulo.save(update_fields=['stock'])
 
-            # 3. Cambiar estado de la orden
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} confirmada"):
                 orden.estado = EstadoOrden.PROCESANDO
                 orden.save()
@@ -100,7 +99,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
             )
         
         with transaction.atomic():
-            # Si la orden estaba en PROCESANDO, reponer stock
             if estado_original == EstadoOrden.PROCESANDO:
                 for detalle in orden.detalles_orden_compra_cliente.all():
                     articulo = detalle.articulo
@@ -141,7 +139,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
             )
         
         with transaction.atomic():
-            # Reponer stock porque la orden estaba completada (stock ya descontado)
             for detalle in orden.detalles_orden_compra_cliente.all():
                 articulo = detalle.articulo
                 articulo.stock += detalle.cantidad
@@ -278,16 +275,34 @@ class EstadisticasGeneralesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # TODO: Implementar la lógica real para calcular estadísticas
-        ventas_hoy = 1500.75
-        ordenes_hoy = 15
-        ventas_mes = 45000.50
-        ordenes_mes = 350
+        today = timezone.now().date()
         
+        # Estados que se consideran una venta real
+        estados_validos = [EstadoOrden.PROCESANDO, EstadoOrden.COMPLETADA]
+
+        # QuerySet base para ventas válidas
+        ventas_validas = OrdenCompraCliente.objects.filter(estado__in=estados_validos)
+
+        # Estadísticas de hoy
+        ventas_hoy_qs = ventas_validas.filter(fecha_orden=today)
+        stats_hoy = ventas_hoy_qs.aggregate(
+            total_ventas=Sum('total'),
+            cantidad_ordenes=Count('orden_compra_cliente_id')
+        )
+
+        # Estadísticas del mes
+        ventas_mes_qs = ventas_validas.filter(
+            fecha_orden__year=today.year,
+            fecha_orden__month=today.month
+        )
+        stats_mes = ventas_mes_qs.aggregate(
+            total_ventas=Sum('total'),
+            cantidad_ordenes=Count('orden_compra_cliente_id')
+        )
+
         return Response({
-            "ventas_hoy": ventas_hoy,
-            "ordenes_hoy": ordenes_hoy,
-            "ventas_mes": ventas_mes,
-            "ordenes_mes": ordenes_mes,
-            "detail": "Estadísticas generales de ventas (datos de ejemplo)."
+            "ventas_hoy": stats_hoy['total_ventas'] or 0,
+            "ordenes_hoy": stats_hoy['cantidad_ordenes'] or 0,
+            "ventas_mes": stats_mes['total_ventas'] or 0,
+            "ordenes_mes": stats_mes['cantidad_ordenes'] or 0,
         }, status=status.HTTP_200_OK)
