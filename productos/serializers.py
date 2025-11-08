@@ -1,6 +1,7 @@
 """
 Serializadores para el módulo de Catálogo de Productos
 """
+import uuid
 from rest_framework import serializers
 from productos.models import LineaArticulo, GrupoArticulo, Articulo
 
@@ -20,7 +21,12 @@ class LineaArticuloSerializer(serializers.ModelSerializer):
             'fecha_creacion',
             'fecha_modificacion'
         ]
-        read_only_fields = ['fecha_creacion', 'fecha_modificacion']
+        read_only_fields = ['linea_id', 'fecha_creacion', 'fecha_modificacion']
+    
+    def create(self, validated_data):
+        """Genera automáticamente el UUID"""
+        validated_data['linea_id'] = uuid.uuid4()
+        return super().create(validated_data)
 
 
 class GrupoArticuloSerializer(serializers.ModelSerializer):
@@ -44,7 +50,12 @@ class GrupoArticuloSerializer(serializers.ModelSerializer):
             'fecha_creacion',
             'fecha_modificacion'
         ]
-        read_only_fields = ['fecha_creacion', 'fecha_modificacion']
+        read_only_fields = ['grupo_id', 'fecha_creacion', 'fecha_modificacion']
+    
+    def create(self, validated_data):
+        """Genera automáticamente el UUID"""
+        validated_data['grupo_id'] = uuid.uuid4()
+        return super().create(validated_data)
 
 
 class ArticuloSerializer(serializers.ModelSerializer):
@@ -82,7 +93,12 @@ class ArticuloSerializer(serializers.ModelSerializer):
             'fecha_creacion',
             'fecha_modificacion'
         ]
-        read_only_fields = ['fecha_creacion', 'fecha_modificacion']
+        read_only_fields = ['articulo_id', 'fecha_creacion', 'fecha_modificacion']
+    
+    def create(self, validated_data):
+        """Genera automáticamente el UUID"""
+        validated_data['articulo_id'] = uuid.uuid4()
+        return super().create(validated_data)
     
     def get_linea_detalle(self, obj):
         """

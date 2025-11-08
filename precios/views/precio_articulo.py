@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from precios.models import ListaPrecio, PrecioArticulo
 from precios.serializers.lista_precio import ListaPrecioSerializer, ListaPrecioCrearActualizarSerializer
 from precios.serializers.precio_articulo import *
+from auditoria.signals import set_current_user, set_audit_motivo
 
 class PrecioArticuloViewSet(viewsets.ModelViewSet):
 
@@ -25,14 +26,35 @@ class PrecioArticuloViewSet(viewsets.ModelViewSet):
         return queryset
 
     def get_serializer_class(self):
-        """
         if self.action == 'list':
-            return PrecioArticuloSerializer
+            return PrecioArticuloListSerializer
         elif self.action == 'retrieve':
             return PrecioArticuloDetalleSerializer
         else:
             return PrecioArticuloCrearActualizarSerializer
-        """
+
+    def perform_create(self, serializer):
+        """Establece el contexto de auditoría antes de crear"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        
+        motivo = self.request.data.get('motivo', None)
+        if motivo:
+            set_audit_motivo(motivo)
+        
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """Establece el contexto de auditoría antes de actualizar"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        
+        motivo = self.request.data.get('motivo', None)
+        if motivo:
+            set_audit_motivo(motivo)
+        
+        serializer.save()
+
 
 #precios en la lista
 class ListaPrecioArticuloViewSet(viewsets.ModelViewSet):
@@ -60,12 +82,33 @@ class ListaPrecioArticuloViewSet(viewsets.ModelViewSet):
         else:
             return PrecioArticuloCrearActualizarSerializer
 
+    def perform_create(self, serializer):
+        """Establece el contexto de auditoría antes de crear"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        
+        motivo = self.request.data.get('motivo', None)
+        if motivo:
+            set_audit_motivo(motivo)
+        
+        serializer.save()
+
+    def perform_update(self, serializer):
+        """Establece el contexto de auditoría antes de actualizar"""
+        if self.request.user.is_authenticated:
+            set_current_user(self.request.user)
+        
+        motivo = self.request.data.get('motivo', None)
+        if motivo:
+            set_audit_motivo(motivo)
+        
+        serializer.save()
+
     def create(self, request, *args, **kwargs):
         lista_id = self.kwargs.get('lista_id')
 
         #existe
         try:
-            #arreglar
             lista = ListaPrecio.objects.get(lista_precio_id=lista_id)
         except ListaPrecio.DoesNotExist:
             return Response({'error': 'Lista de precios no encontrada.'}, status=status.HTTP_404_NOT_FOUND)
