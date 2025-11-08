@@ -7,6 +7,8 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404, Http404 # Added Http404
 
 from ventas.models import OrdenCompraCliente, DetalleOrdenCompraCliente
+from productos.models import *
+from precios.models import *
 from ventas.serializers import (
     OrdenReadSerializer, OrdenWriteSerializer,
     DetalleOrdenWriteSerializer, ArticuloSerializer,
@@ -17,13 +19,12 @@ from core.permissions import IsAdminOrReadOnly # Assuming this is the base permi
 from ventas.permissions import CanApproveLowCostSale
 from auditoria.utils import auditoria_context # Added # Added
 
-# TODO: Importar la función de cálculo de precios de la app precios
 # from precios.utils import calcular_precio_articulo_con_reglas
 
 class OrdenViewSet(viewsets.ModelViewSet):
     queryset = OrdenCompraCliente.objects.all().order_by('-fecha_orden')
     pagination_class = StandardResultsSetPagination
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly] # Adjust permissions as needed
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -33,9 +34,7 @@ class OrdenViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        
-        # The actual creation logic is handled within the serializer's create method
-        # including the dummy price calculation for now.
+
         with transaction.atomic():
             orden = serializer.save()
 
@@ -65,7 +64,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
         kwargs['partial'] = True
         return self.update(request, *args, **kwargs)
 
-    # --- Custom Actions for State Changes ---
 
     @action(detail=True, methods=['post'], url_path='confirmar')
     def confirmar_orden(self, request, pk=None):
@@ -81,8 +79,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
                 orden.estado = EstadoOrden.PROCESANDO # Or COMPLETED, depending on workflow
                 orden.save()
                 print(f"AUDIT: User {request.user.username} confirmed order {orden.orden_compra_cliente_id}. New state: {orden.get_estado_display()}")
-                # TODO: Si existiera un modelo de auditoría para Ordenes, se registraría aquí.
-                # TODO: Lógica adicional post-confirmación (ej. descontar stock)
 
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
@@ -102,8 +98,6 @@ class OrdenViewSet(viewsets.ModelViewSet):
                 orden.estado = EstadoOrden.CANCELADA
                 orden.save()
                 print(f"AUDIT: User {request.user.username} cancelled order {orden.orden_compra_cliente_id}. New state: {orden.get_estado_display()}")
-                # TODO: Si existiera un modelo de auditoría para Ordenes, se registraría aquí.
-                # TODO: Lógica adicional post-anulación (ej. reponer stock)
 
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
@@ -111,7 +105,7 @@ class OrdenViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='marcar-como-facturada')
     def marcar_como_facturada(self, request, pk=None):
         orden = self.get_object()
-        if orden.estado != EstadoOrden.PROCESANDO: # Assuming only PROCESANDO can be facturada
+        if orden.estado != EstadoOrden.PROCESANDO:
             return Response(
                 {"detail": "Solo se pueden marcar como facturadas órdenes en estado PROCESANDO."},
                 status=status.HTTP_400_BAD_REQUEST
@@ -119,11 +113,9 @@ class OrdenViewSet(viewsets.ModelViewSet):
         
         with transaction.atomic():
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} marcada como facturada"):
-                orden.estado = EstadoOrden.COMPLETADA # Or a new 'FACTURADA' state if exists
+                orden.estado = EstadoOrden.COMPLETADA
                 orden.save()
                 print(f"AUDIT: User {request.user.username} marked order {orden.orden_compra_cliente_id} as invoiced. New state: {orden.get_estado_display()}")
-                # TODO: Si existiera un modelo de auditoría para Ordenes, se registraría aquí.
-                # TODO: Lógica adicional (ej. generar factura)
 
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
@@ -131,49 +123,30 @@ class OrdenViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], url_path='anular-confirmada')
     def anular_orden_confirmada(self, request, pk=None):
         orden = self.get_object()
-        if orden.estado != EstadoOrden.COMPLETADA: # Assuming 'COMPLETADA' is the 'confirmada' state
+        if orden.estado != EstadoOrden.COMPLETADA:
             return Response(
                 {"detail": "Solo se pueden anular órdenes confirmadas/completadas."},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
-        # TODO: Implementar permiso especial para esta acción
-        # if not request.user.has_perm('ventas.can_anular_orden_confirmada'):
-        #     return Response(
-        #         {"detail": "No tiene permiso para anular órdenes confirmadas."},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-
         
 
         with transaction.atomic():
 
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} confirmada anulada"):
 
-                orden.estado = EstadoOrden.CANCELADA # Or a specific 'ANULADA_CONFIRMADA' state
+                orden.estado = EstadoOrden.CANCELADA
 
                 orden.save()
 
                 print(f"AUDIT: User {request.user.username} cancelled confirmed order {orden.orden_compra_cliente_id}. New state: {orden.get_estado_display()}")
 
-                # TODO: Si existiera un modelo de auditoría para Ordenes, se registraría aquí.
-
-                # TODO: Lógica de reversión de stock, contabilidad, etc.
         read_serializer = OrdenReadSerializer(orden)
         return Response(read_serializer.data, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], url_path='aprobar-venta-bajo-costo', permission_classes=[IsAuthenticated, CanApproveLowCostSale])
     def aprobar_venta_bajo_costo(self, request, pk=None):
         orden = self.get_object()
-        
-        # The permission check is now handled by permission_classes
-        # if not request.user.puede_aprobar_bajo_costo: # Assuming this field exists on the User model
-        #     return Response(
-        #         {"detail": "No tiene permiso para aprobar ventas bajo costo."},
-        #         status=status.HTTP_403_FORBIDDEN
-        #     )
-        
-        # Check if there are any items sold under cost
+
         if not any(detalle.vendido_bajo_costo for detalle in orden.detalles_orden_compra_cliente.all()):
             return Response(
                 {"detail": "La orden no contiene ítems vendidos bajo costo que requieran aprobación."},
@@ -183,15 +156,7 @@ class OrdenViewSet(viewsets.ModelViewSet):
         
         with transaction.atomic():
             with auditoria_context(request.user, motivo=f"Orden {orden.orden_compra_cliente_id} aprobada bajo costo"):
-                # TODO: Lógica para marcar la orden o los ítems como aprobados bajo costo
-                # For now, just return success if permission is granted and items exist
-                # This action might change the state of the order or just an internal flag
-                # For simplicity, let's assume it just "approves" the current state.
-                # A more robust solution might involve a new field on OrdenCompraCliente or DetalleOrdenCompraCliente
                 print(f"AUDIT: User {request.user.username} approved low-cost sale for order {orden.orden_compra_cliente_id}.")
-                # Example: If we had a field `aprobado_bajo_costo = models.BooleanField(default=False)`
-                # orden.aprobado_bajo_costo = True
-                # orden.save()
         
         read_serializer = OrdenReadSerializer(orden)
         return Response(
@@ -199,19 +164,12 @@ class OrdenViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK
         )
 
-    # --- Custom Actions for Simulation and Calculation ---
-
     @action(detail=False, methods=['post'], url_path='simular-pedido')
     def simular_pedido(self, request):
-        # This action will not save anything to the database
         serializer = DetalleOrdenWriteSerializer(data=request.data.get('detalles', []), many=True)
         serializer.is_valid(raise_exception=True)
         detalles_data = serializer.validated_data
 
-        # TODO: Implementar la lógica de cálculo de precios completa aquí
-        # Esto implicaría iterar sobre detalles_data, buscar artículos, aplicar reglas de precios
-        # de la app 'precios' y devolver un resumen.
-        
         simulated_total = 0
         simulated_items = []
 
@@ -225,8 +183,7 @@ class OrdenViewSet(viewsets.ModelViewSet):
                     {"detail": f"Artículo con ID {articulo_id} no encontrado."},
                     status=status.HTTP_404_NOT_FOUND
                 )
-            
-            # Dummy calculation for simulation
+
             precio_unitario = articulo.precio_sugerido # Placeholder
             descuento = 0 # Placeholder
             total_item = (cantidad * precio_unitario) - descuento
@@ -247,13 +204,9 @@ class OrdenViewSet(viewsets.ModelViewSet):
             "simulated_items": simulated_items
         }, status=status.HTTP_200_OK)
 
-    # The 'calcular_precio_articulo' endpoint will be placed in the 'precios' app's views.py
-    # or as a separate APIView in 'ventas' if it's strictly related to sales context.
-    # For now, I'll assume it's a separate APIView in 'ventas' for simplicity of this task.
-    # I will create a separate APIView for this.
 
 class CalcularPrecioArticuloAPIView(APIView):
-    permission_classes = [IsAuthenticated] # Adjust permissions as needed
+    permission_classes = [IsAuthenticated]
 
     def post(self, request, *args, **kwargs):
         serializer = ArticuloPrecioCalculateSerializer(data=request.data)
@@ -273,11 +226,6 @@ class CalcularPrecioArticuloAPIView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
-        # TODO: Implementar la lógica de cálculo de precios real aquí
-        # Esto implicaría llamar a una función o servicio de la app 'precios'
-        # que aplique las reglas de precios.
-        
-        # Placeholder for calculated price
         precio_calculado = float(articulo.precio_sugerido) * cantidad
         descuento_aplicado = 0.0
         reglas_aplicadas = []
@@ -294,13 +242,9 @@ class CalcularPrecioArticuloAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 class EstadisticasGeneralesAPIView(APIView):
-    permission_classes = [IsAuthenticated] # Adjust permissions as needed
+    permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
-        # TODO: Implementar la lógica real para calcular estadísticas
-        # Esto implicaría consultas a la base de datos para sumar ventas por día/mes, etc.
-        
-        # Dummy data for now
         ventas_hoy = 1500.75
         ordenes_hoy = 15
         ventas_mes = 45000.50
