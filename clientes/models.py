@@ -36,3 +36,4 @@ class HistorialCompra(models.Model):
     class Meta:
         db_table = 'historial_compras'
         ordering = ['-fecha_compra']
+
