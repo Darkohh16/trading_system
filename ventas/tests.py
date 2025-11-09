@@ -25,7 +25,7 @@ class OrdenAPITestCase(APITestCase):
             first_name='Admin',
             last_name='User',
             email='admin@example.com',
-            perfil=1, # ADMINISTRADOR
+            perfil=1,  # ADMINISTRADOR
             puede_aprobar_bajo_costo=True
         )
         self.vendedor_user = Usuario.objects.create_user(
@@ -34,7 +34,7 @@ class OrdenAPITestCase(APITestCase):
             first_name='Vendedor',
             last_name='User',
             email='vendedor@example.com',
-            perfil=2, # VENDEDOR
+            perfil=2,  # VENDEDOR
             puede_aprobar_bajo_costo=False
         )
         self.client.force_authenticate(user=self.vendedor_user)
@@ -63,7 +63,8 @@ class OrdenAPITestCase(APITestCase):
             fecha_vigencia_fin=date(2024, 12, 31)
         )
         self.linea = LineaArticulo.objects.create(linea_id=uuid.uuid4(), codigo_linea='LIN01', nombre_linea='Linea 1')
-        self.grupo = GrupoArticulo.objects.create(grupo_id=uuid.uuid4(), codigo_grupo='GRP01', nombre_grupo='Grupo 1', linea=self.linea)
+        self.grupo = GrupoArticulo.objects.create(grupo_id=uuid.uuid4(), codigo_grupo='GRP01', nombre_grupo='Grupo 1',
+                                                  linea=self.linea)
         self.articulo1 = Articulo.objects.create(
             articulo_id=uuid.uuid4(),
             codigo_articulo='ART001',
@@ -122,11 +123,11 @@ class OrdenAPITestCase(APITestCase):
         self.assertEqual(DetalleOrdenCompraCliente.objects.count(), 2)
         orden = OrdenCompraCliente.objects.first()
         self.assertEqual(orden.estado, EstadoOrden.PENDIENTE)
-        self.assertAlmostEqual(float(orden.subtotal), 240.00) # 2*100 + 1*40
+        self.assertAlmostEqual(float(orden.subtotal), 240.00)  # 2*100 + 1*40
         self.assertAlmostEqual(float(orden.total), 240.00)
 
     def test_list_ordenes(self):
-        self.test_create_orden() # Create an order first
+        self.test_create_orden()  # Create an order first
         url = reverse('orden-list')
         response = self.client.get(url, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -134,7 +135,7 @@ class OrdenAPITestCase(APITestCase):
         self.assertIn('detalles_orden_compra_cliente', response.data['results'][0])
 
     def test_retrieve_orden(self):
-        self.test_create_orden() # Create an order first
+        self.test_create_orden()  # Create an order first
         orden = OrdenCompraCliente.objects.first()
         url = reverse('orden-detail', kwargs={'pk': str(orden.orden_compra_cliente_id)})
         response = self.client.get(url, format='json')
@@ -146,7 +147,7 @@ class OrdenAPITestCase(APITestCase):
         self.test_create_orden()
         orden = OrdenCompraCliente.objects.first()
         url = reverse('orden-detail', kwargs={'pk': str(orden.orden_compra_cliente_id)})
-        
+
         new_cliente = Cliente.objects.create(
             cliente_id=uuid.uuid4(),
             nro_documento='987654321',
@@ -156,12 +157,12 @@ class OrdenAPITestCase(APITestCase):
         )
         update_data = {
             'cliente_id': str(new_cliente.cliente_id),
-            'vendedor_id': self.vendedor_user.username, # Required by serializer
-            'lista_precio_id': str(self.lista_precio.lista_precio_id), # Required by serializer
-            'empresa_id': str(self.empresa.empresa_id), # Required by serializer
-            'sucursal_id': str(self.sucursal.sucursal_id), # Required by serializer
-            'canal': CanalVenta.B2B, # Required by serializer
-            'detalles': [] # Required by serializer, but not processed by update method
+            'vendedor_id': self.vendedor_user.username,  # Required by serializer
+            'lista_precio_id': str(self.lista_precio.lista_precio_id),  # Required by serializer
+            'empresa_id': str(self.empresa.empresa_id),  # Required by serializer
+            'sucursal_id': str(self.sucursal.sucursal_id),  # Required by serializer
+            'canal': CanalVenta.B2B,  # Required by serializer
+            'detalles': []  # Required by serializer, but not processed by update method
         }
         response = self.client.put(url, update_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
@@ -177,12 +178,12 @@ class OrdenAPITestCase(APITestCase):
         url = reverse('orden-detail', kwargs={'pk': str(orden.orden_compra_cliente_id)})
         update_data = {
             'canal': CanalVenta.ECOMMERCE,
-            'cliente_id': str(self.cliente.cliente_id), # Required by serializer
-            'vendedor_id': self.vendedor_user.username, # Required by serializer
-            'lista_precio_id': str(self.lista_precio.lista_precio_id), # Required by serializer
-            'empresa_id': str(self.empresa.empresa_id), # Required by serializer
-            'sucursal_id': str(self.sucursal.sucursal_id), # Required by serializer
-            'detalles': [] # Required by serializer
+            'cliente_id': str(self.cliente.cliente_id),  # Required by serializer
+            'vendedor_id': self.vendedor_user.username,  # Required by serializer
+            'lista_precio_id': str(self.lista_precio.lista_precio_id),  # Required by serializer
+            'empresa_id': str(self.empresa.empresa_id),  # Required by serializer
+            'sucursal_id': str(self.sucursal.sucursal_id),  # Required by serializer
+            'detalles': []  # Required by serializer
         }
         response = self.client.put(url, update_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
@@ -225,7 +226,7 @@ class OrdenAPITestCase(APITestCase):
         url = reverse('orden-anular-confirmada', kwargs={'pk': str(orden.orden_compra_cliente_id)})
         # Vendedor user does not have special permission
         response = self.client.post(url, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK) # Currently no permission check, just state check
+        self.assertEqual(response.status_code, status.HTTP_200_OK)  # Currently no permission check, just state check
 
     def test_aprobar_venta_bajo_costo_no_permission(self):
         self.test_create_orden()
@@ -240,7 +241,7 @@ class OrdenAPITestCase(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_aprobar_venta_bajo_costo_with_permission(self):
-        self.client.force_authenticate(user=self.admin_user) # Admin has permission
+        self.client.force_authenticate(user=self.admin_user)  # Admin has permission
         self.test_create_orden()
         orden = OrdenCompraCliente.objects.first()
         # Make an item sold under cost (for testing purposes)
@@ -263,7 +264,7 @@ class OrdenAPITestCase(APITestCase):
         response = self.client.post(url, sim_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('simulated_total', response.data)
-        self.assertAlmostEqual(response.data['simulated_total'], 3*100.00 + 2*40.00) # 300 + 80 = 380
+        self.assertAlmostEqual(response.data['simulated_total'], 3 * 100.00 + 2 * 40.00)  # 300 + 80 = 380
 
     def test_calcular_precio_articulo(self):
         url = reverse('calcular_precio_articulo')
@@ -276,7 +277,7 @@ class OrdenAPITestCase(APITestCase):
         response = self.client.post(url, calc_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('total_calculado', response.data)
-        self.assertAlmostEqual(response.data['total_calculado'], 5 * 100.00) # 500
+        self.assertAlmostEqual(response.data['total_calculado'], 5 * 100.00)  # 500
 
     def test_estadisticas_generales(self):
         url = reverse('estadisticas_ventas')

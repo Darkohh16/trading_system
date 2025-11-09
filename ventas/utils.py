@@ -29,7 +29,7 @@ def calculate_price(articulo: Articulo, lista_precio: ListaPrecio, canal: int, c
             }
     """
     today = date.today()
-    
+
     # 1. Obtener el precio base y mínimo del artículo en la lista de precios
     try:
         precio_info = PrecioArticulo.objects.get(
@@ -58,13 +58,13 @@ def calculate_price(articulo: Articulo, lista_precio: ListaPrecio, canal: int, c
               Q(fecha_inicio__lte=today) & \
               Q(fecha_fin__gte=today) & \
               (
-               Q(aplica_articulo=articulo) |
-               Q(aplica_grupo=articulo.grupo_id) |
-               Q(aplica_linea=articulo.grupo_id.linea))
-    
+                      Q(aplica_articulo=articulo) |
+                      Q(aplica_grupo=articulo.grupo_id) |
+                      Q(aplica_linea=articulo.grupo_id.linea))
+
     # Filtro por canal de venta (si la regla lo especifica)
     q_rules &= (Q(aplica_canal__isnull=True) | Q(aplica_canal='') | Q(aplica_canal=str(canal)))
-    
+
     # Filtro por cantidad mínima
     q_rules &= (Q(cantidad_minima__isnull=True) | Q(cantidad_minima__lte=cantidad))
 
@@ -73,21 +73,21 @@ def calculate_price(articulo: Articulo, lista_precio: ListaPrecio, canal: int, c
     # 4. Aplicar las reglas en orden de prioridad
     for regla in reglas:
         descuento_de_regla = Decimal('0.0')
-        
+
         if regla.tipo_regla == TipoRegla.PRECIO_FINAL:
             # Esta regla establece un precio final, ignorando cálculos anteriores.
             # El descuento se calcula como la diferencia para fines informativos.
             descuento_de_regla = precio_calculado - regla.valor_descuento
             precio_calculado = regla.valor_descuento
-        
+
         elif regla.tipo_regla == TipoRegla.DESCUENTO:
             if regla.tipo_descuento == TipoDescuento.PORCENTAJE:
                 descuento_de_regla = (precio_calculado * regla.valor_descuento) / 100
             elif regla.tipo_descuento == TipoDescuento.MONTO:
                 descuento_de_regla = regla.valor_descuento
-            
+
             precio_calculado -= descuento_de_regla
-        
+
         elif regla.tipo_regla == TipoRegla.RECARGO:
             if regla.tipo_descuento == TipoDescuento.PORCENTAJE:
                 recargo = (precio_calculado * regla.valor_descuento) / 100

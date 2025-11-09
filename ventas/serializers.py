@@ -51,6 +51,7 @@ class SucursalSerializer(serializers.ModelSerializer):
 
 class OrdenDetalleReadSerializer(serializers.ModelSerializer):
     articulo = ArticuloSerializer(read_only=True)
+
     # estado_display = serializers.CharField(source='get_estado_display', read_only=True)
 
     class Meta:
@@ -108,17 +109,12 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
         ]
 
     def _recalculate_and_save_totals(self, orden):
-        """
-        Recalcula los totales de la orden desde cero basándose en sus detalles.
-        Este método es crucial para sobrescribir la lógica problemática en el save() del modelo
-        y garantizar la consistencia de los datos, especialmente después de operaciones en lote.
-        """
         # Usamos F() para referenciar campos del modelo en la agregación
         aggregates = orden.detalles_orden_compra_cliente.aggregate(
             total_general=Coalesce(Sum(F('cantidad') * F('precio_unitario')), 0, output_field=DecimalField()),
             total_descuento_items=Coalesce(Sum('descuento'), 0, output_field=DecimalField())
         )
-        
+
         # El subtotal es el precio de los items sin descuentos de reglas
         subtotal_calculado = orden.detalles_orden_compra_cliente.aggregate(
             total=Coalesce(Sum(F('cantidad') * F('precio_base')), 0, output_field=DecimalField())
@@ -127,21 +123,22 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
         orden.subtotal = subtotal_calculado
         orden.descuento_total = aggregates['total_descuento_items']
         orden.total = aggregates['total_general']
-        
+
         orden.save(update_fields=['subtotal', 'descuento_total', 'total'])
 
     @transaction.atomic
     def create(self, validated_data):
         detalles_data = validated_data.pop('detalles')
         canal = validated_data.get('canal')
-        
+
         try:
             cliente = Cliente.objects.get(cliente_id=validated_data.pop('cliente_id'))
             vendedor = Usuario.objects.get(username=validated_data.pop('vendedor_id'))
             lista_precio = ListaPrecio.objects.get(lista_precio_id=validated_data.pop('lista_precio_id'))
             empresa = Empresa.objects.get(empresa_id=validated_data.pop('empresa_id'))
             sucursal = Sucursal.objects.get(sucursal_id=validated_data.pop('sucursal_id'))
-        except (Cliente.DoesNotExist, Usuario.DoesNotExist, ListaPrecio.DoesNotExist, Empresa.DoesNotExist, Sucursal.DoesNotExist) as e:
+        except (Cliente.DoesNotExist, Usuario.DoesNotExist, ListaPrecio.DoesNotExist, Empresa.DoesNotExist,
+                Sucursal.DoesNotExist) as e:
             raise serializers.ValidationError(f"Error al encontrar una entidad relacionada: {e}")
 
         orden = OrdenCompraCliente.objects.create(
@@ -182,7 +179,7 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
                 reglas_aplicadas=price_data["reglas_aplicadas"],
                 vendido_bajo_costo=price_data["vendido_bajo_costo"],
             )
-        
+
         self._recalculate_and_save_totals(orden)
         return orden
 
@@ -194,7 +191,7 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
         detalles_data = validated_data.pop('detalles', None)
         canal = validated_data.get('canal', instance.canal)
         lista_precio_id = validated_data.get('lista_precio_id', instance.lista_precio_id)
-        
+
         try:
             lista_precio = ListaPrecio.objects.get(lista_precio_id=lista_precio_id)
         except ListaPrecio.DoesNotExist:
@@ -210,7 +207,8 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
         instance.save()
 
         if detalles_data is not None:
-            existing_details = {str(d.detalle_orden_compra_cliente_id): d for d in instance.detalles_orden_compra_cliente.all()}
+            existing_details = {str(d.detalle_orden_compra_cliente_id): d for d in
+                                instance.detalles_orden_compra_cliente.all()}
             incoming_ids = {str(item.get('id')) for item in detalles_data if item.get('id')}
 
             ids_to_delete = set(existing_details.keys()) - incoming_ids
@@ -241,11 +239,11 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
                     detail = existing_details.get(str(item_id))
                     if detail:
                         detail.cantidad = cantidad
-                        detail.precio_base=price_data["precio_base"]
-                        detail.precio_unitario=price_data["precio_final"]
-                        detail.descuento=price_data["descuento_total"]
-                        detail.reglas_aplicadas=price_data["reglas_aplicadas"]
-                        detail.vendido_bajo_costo=price_data["vendido_bajo_costo"]
+                        detail.precio_base = price_data["precio_base"]
+                        detail.precio_unitario = price_data["precio_final"]
+                        detail.descuento = price_data["descuento_total"]
+                        detail.reglas_aplicadas = price_data["reglas_aplicadas"]
+                        detail.vendido_bajo_costo = price_data["vendido_bajo_costo"]
                         detail.save()
                 else:
                     DetalleOrdenCompraCliente.objects.create(
@@ -258,7 +256,7 @@ class OrdenWriteSerializer(serializers.ModelSerializer):
                         reglas_aplicadas=price_data["reglas_aplicadas"],
                         vendido_bajo_costo=price_data["vendido_bajo_costo"],
                     )
-        
+
         self._recalculate_and_save_totals(instance)
         return instance
 
@@ -268,4 +266,3 @@ class ArticuloPrecioCalculateSerializer(serializers.Serializer):
     lista_precio_id = serializers.UUIDField()
     canal = serializers.ChoiceField(choices=CanalVenta.choices)
     cantidad = serializers.IntegerField(min_value=1)
-
